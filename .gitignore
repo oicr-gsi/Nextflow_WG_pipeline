@@ -1,9 +1,4 @@
 .nextflow/
 logs/
 work/
-bcl2fastq/tests/
-bwaMem/output/
-vep/input/
-vep/output/
-mutect2/input/
-mutect2/output/
+tests/
