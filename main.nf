@@ -1,10 +1,41 @@
 nextflow.enable.dsl=2
 
+include {BCL2FASTQ} from './workflows/bcl2fastq'
+include {bwaMem} from './modules/bwamem'
 include {vep} from "./workflows/vep"
 include {mutect2} from "./modules/mutect2"
 
-
 workflow {
+
+    channel
+        .of([meta: [id: params.bcl2fastq.meta_id, lane: params.bcl2fastq.meta_lane], samplesheet: file(params.bcl2fastq.samplesheet), run_dir: file(params.bcl2fastq.run_dir)])
+        .set { bcl2fastq_input }
+    
+    BCL2FASTQ(bcl2fastq_input)
+
+    fastq_input = channel
+        .fromPath("${params.test_data}/bwamem/input/*${params.bwamem.meta}*.fastq.gz")
+        .map { file -> 
+            return tuple(params.bwamem.meta, file)
+        }
+        .groupTuple()
+
+    bwaMem_reads = fastq_input
+        .map { key, files ->
+            def r1 = files.find { it.name.endsWith('_R1.fastq.gz') }
+            def r2 = files.find { it.name.endsWith('_R2.fastq.gz') }
+            tuple(params.bwamem.meta, r1, r2)
+        }
+
+    bwaMem(
+        bwaMem_reads,
+        channel.of(params.bwamem.readGroups),
+        channel.of(params.bwamem.reference),
+        channel.of(params.bwamem.sort_bam),
+        channel.of(params.bwamem.threads),
+        channel.of(params.bwamem.addParem)
+    )
+   
     tumor_bam_files = channel.fromPath("${params.test_data}/mutect2/input/*${params.mutect2.tumor_meta}*.bam")
     tumor_bam_index_files = channel.fromPath("${params.test_data}/mutect2/input/*${params.mutect2.tumor_meta}*.bai")
 

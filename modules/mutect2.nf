@@ -1,3 +1,4 @@
+nextflow.enable.dsl=2
 include {GATK4_MUTECT2} from "./gatk4_mutect2"
 
 workflow mutect2 {

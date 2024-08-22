@@ -1,3 +1,4 @@
+nextflow.enable.dsl=2
 include {ENSEMBLVEP_VEP} from "../modules/ensemblvep_vep"
 
 workflow vep {

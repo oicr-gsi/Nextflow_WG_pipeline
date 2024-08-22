@@ -1,3 +1,4 @@
+nextflow.enable.dsl=2
 process ENSEMBLVEP_VEP {
     tag "$tumorName"
     publishDir  "${params.test_data}/vep/output", mode: "copy"

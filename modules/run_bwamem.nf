@@ -1,13 +1,17 @@
+nextflow.enable.dsl=2
 process BWA_MEM {
-    tag "$meta.id"
+    tag "$meta"
 
-    publishDir  "${params.bwa_outdir}", mode: 'copy'
+    publishDir  "${params.test_data}/bwamem/output", mode: 'copy'
 
     input:
     tuple val(meta), path(read1), path(read2)
-    path fasta
+    val readGroups
+    val fasta
     val sort_bam
     val threads
+    val modules
+    val addParem
 
     output:
     tuple val(meta), path("*.bam")  , emit: bam,    optional: true
@@ -24,7 +28,7 @@ process BWA_MEM {
     
     def args = task.ext.args ?: ''
     def args2 = task.ext.args2 ?: ''
-    def prefix = task.ext.prefix ?: "${meta.id}"
+    def prefix = task.ext.prefix ?: "${meta}"
     def samtools_command = sort_bam ? 'sort' : 'view'
     def extension = args2.contains("--output-fmt sam")   ? "sam" :
                     args2.contains("--output-fmt cram")  ? "cram":
@@ -33,17 +37,21 @@ process BWA_MEM {
                     "bam"
     def reference = fasta && extension=="cram"  ? "--reference ${fasta}" : ""
     if (!fasta && extension=="cram") error "Fasta reference is required for CRAM output"
+    def module_list = modules.split(',')
+    def module_load_cmds = module_list.collect { module -> "module load ${module}" }.join('\n')
+    def fasta_dir = file(fasta).getParent()
+    def fasta_name = file(fasta).getName()
+
     """
-    module load bwa
-    module load samtools
-    module load hg38-bwa-index-with-alt
+    ${module_load_cmds}
 
-    cp ${params.HG38_BWA_INDEX_WITH_ALT_ROOT}/hg38_random.fa.{amb,ann,bwt,pac,sa,alt,fai} .
+    cp ${fasta}.{amb,ann,bwt,pac,sa,alt,fai} .
 
-    bwa mem \\
+    bwa mem -M \\
         $args \\
-        -t $threads  \\
-        hg38_random.fa -B hg38_random.fa \\
+        -t $threads $addParem \\
+        -R $readGroups \\
+        $fasta \\
         $read1 \\
         $read2 \\
         | samtools $samtools_command $args2 ${reference} --threads $threads -o ${prefix}.${extension} -
