@@ -1,10 +1,10 @@
+nextflow.enable.dsl=2
+
 process PICARD_MARKDUPLICATES {
     tag "$meta.id"
 
     input:
-    tuple val(meta), path(reads)
-    path fasta
-    path fai
+    path reads
     val picard_module
 
     output:
@@ -21,7 +21,6 @@ process PICARD_MARKDUPLICATES {
     def args = task.ext.args ?: ''
     def prefix = task.ext.prefix ?: "${meta.id}"
     def suffix = task.ext.suffix    ?: "${reads.getExtension()}"
-    def reference = fasta ? "--REFERENCE_SEQUENCE ${fasta}" : ""
     def avail_mem = 3072
     if (!task.memory) {
         log.info '[Picard MarkDuplicates] Available memory not known - defaulting to 3GB. Specify process memory requirements to change this.'
@@ -42,7 +41,6 @@ process PICARD_MARKDUPLICATES {
         $args \\
         --INPUT $reads \\
         --OUTPUT ${prefix}.${suffix} \\
-        $reference \\
         --METRICS_FILE ${prefix}.MarkDuplicates.metrics.txt
 
     cat <<-END_VERSIONS > versions.yml
