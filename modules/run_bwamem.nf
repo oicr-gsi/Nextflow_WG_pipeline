@@ -39,8 +39,6 @@ process BWA_MEM {
     if (!fasta && extension=="cram") error "Fasta reference is required for CRAM output"
     def module_list = modules.split(',')
     def module_load_cmds = module_list.collect { module -> "module load ${module}" }.join('\n')
-    def fasta_dir = file(fasta).getParent()
-    def fasta_name = file(fasta).getName()
 
     """
     ${module_load_cmds}
