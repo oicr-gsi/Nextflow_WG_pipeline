@@ -4,6 +4,7 @@ include {BCL2FASTQ} from './workflows/bcl2fastq'
 include {bwaMem} from './modules/bwamem'
 include {vep} from "./workflows/vep"
 include {mutect2} from "./modules/mutect2"
+include {delly} from './workflows/delly'
 
 workflow {
 
@@ -78,5 +79,28 @@ workflow {
         channel.value(normal_name),
         channel.value(vep_tumor_only),
         channel.value(target_bed)
+    )
+
+    tumor_bam_files = channel.fromPath("${params.test_data}/delly/input/*${params.delly.tumorName}*.bam")
+    tumor_bam_index_files = channel.fromPath("${params.test_data}/delly/input/*${params.delly.tumorName}*.bai")
+
+    if (!params.delly.tumor_only_mode) {
+        normal_bam_files = channel.fromPath("${params.test_data}/delly/input/*${params.delly.normalName}*.bam")
+        normal_bam_index_files = channel.fromPath("${params.test_data}/delly/input/*${params.delly.normalName}*.bai")
+    }
+
+    if (params.delly.tumor_only_mode) {
+        delly_bams = tumor_bam_files
+        delly_indexes = tumor_bam_index_files
+    } else {
+        delly_bams = tumor_bam_files.mix(normal_bam_files)
+        delly_indexes = tumor_bam_index_files.mix(normal_bam_index_files)
+    }
+    delly (
+        delly_bams,
+        params.delly.tumorName,
+        params.delly.markdup,
+        params.delly.reference,
+        params.delly.picard_module
     )
 }

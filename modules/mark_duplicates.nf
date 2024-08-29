@@ -1,17 +1,19 @@
 nextflow.enable.dsl=2
 
 process PICARD_MARKDUPLICATES {
-    tag "$meta.id"
+    tag "$tumorName"
+    publishDir  "${params.test_data}/marDup/output", mode: "copy"
 
     input:
     path reads
     val picard_module
+    val tumorName
 
     output:
-    tuple val(meta), path("*.bam") , emit: bam,  optional: true
-    tuple val(meta), path("*.bai") , emit: bai,  optional: true
-    tuple val(meta), path("*.cram"), emit: cram, optional: true
-    tuple val(meta), path("*.metrics.txt"), emit: metrics
+    tuple val(tumorName), path("*.bam") , emit: bam,  optional: true
+    tuple val(tumorName), path("*.bai") , emit: bai,  optional: true
+    tuple val(tumorName), path("*.cram"), emit: cram, optional: true
+    tuple val(tumorName), path("*.metrics.txt"), emit: metrics
     path  "versions.yml"                  , emit: versions
 
     when:
@@ -19,29 +21,23 @@ process PICARD_MARKDUPLICATES {
 
     script:
     def args = task.ext.args ?: ''
-    def prefix = task.ext.prefix ?: "${meta.id}"
+    def prefix = task.ext.prefix ?: "${tumorName}"
     def suffix = task.ext.suffix    ?: "${reads.getExtension()}"
-    def avail_mem = 3072
-    if (!task.memory) {
-        log.info '[Picard MarkDuplicates] Available memory not known - defaulting to 3GB. Specify process memory requirements to change this.'
-    } else {
-        avail_mem = (task.memory.mega*0.8).intValue()
-    }
-
+    def avail_mem = 30
+    
     if ("$reads" == "${prefix}.${suffix}") error "Input and output names are the same, use \"task.ext.prefix\" to disambiguate!"
 
     """
     module load $picard_module
-    picard \\
-        -Xmx${avail_mem}M \\
+
+    java -Xmx${avail_mem}G -jar /.mounts/labs/gsi/modulator/sw/Ubuntu20.04/picard-2.19.2/picard.jar MarkDuplicates \
         TMP_DIR=picardTmp \\
         ASSUME_SORTED=true \\
         VALIDATION_STRINGENCY=LENIENT \\
-        MarkDuplicates \\
         $args \\
-        --INPUT $reads \\
-        --OUTPUT ${prefix}.${suffix} \\
-        --METRICS_FILE ${prefix}.MarkDuplicates.metrics.txt
+        INPUT=$reads \\
+        OUTPUT=${prefix}.${suffix} \\
+        METRICS_FILE=${prefix}.MarkDuplicates.metrics.txt
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
@@ -50,7 +46,7 @@ process PICARD_MARKDUPLICATES {
     """
 
     stub:
-    def prefix = task.ext.prefix ?: "${meta.id}"
+    def prefix = task.ext.prefix ?: "${tumorName}"
     def suffix = task.ext.suffix    ?: "${reads.getExtension()}"
     if ("$reads" == "${prefix}.${suffix}") error "Input and output names are the same, use \"task.ext.prefix\" to disambiguate!"
     """

@@ -2,3 +2,4 @@
 logs/
 work/
 tests/
+qsub.sh
