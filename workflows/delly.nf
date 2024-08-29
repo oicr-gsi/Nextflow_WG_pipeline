@@ -6,6 +6,7 @@ include { RUN_DELLY } from "../modules/run_delly.nf"
 workflow delly {
     take:
         inputBams
+        inputBais
         tumorName
         markdup
         reference
@@ -24,19 +25,22 @@ workflow delly {
                 rundelly_exclude_list: "/.mounts/labs/gsi/modulator/sw/data/hg38-delly-1.0/human.hg38.excl.tsv"
             ]
         ]
-
-        def markedBams = markdup ? PICARD_MARKDUPLICATES(inputBams, picard_module, tumorName) : inputBams
-
-        def callType = (inputBams.size() == 1) ? 'unmatched' : 'somatic'
-        def delly_modes = channel.from("DEL", "DUP", "INV", "INS", "BND")
         
-        def delly_inputs = delly_modes
-            .combine(channel.from(markedBams))
-            .combine(channel.value(callType))
-            .combine(channel.value(tumorName))
-            .combine(channel.value(GenomeResources[reference]['rundelly_module']))
-            .combine(channel.value(GenomeResources[reference]['rundelly_fasta']))
-            .combine(channel.value(GenomeResources[reference]['rundelly_exclude_list']))
+        def markedBams = markdup ? PICARD_MARKDUPLICATES(inputBams, picard_module, tumorName).out.bam : inputBams
+        def markedBais = markdup ? PICARD_MARKDUPLICATES(inputBams, picard_module, tumorName).out.bai : inputBais
+        def bamCount = markedBams.map { it -> it.findAll { file -> file.name.endsWith('.bam') }.size() }
+        def callType = bamCount.map { count -> count == 1 ? 'unmatched' : 'somatic' }
+        def delly_modes = channel.from("DEL", "DUP", "INV", "INS", "BND")
+        markedBams.view(it -> "markedBams: $it")
 
-        RUN_DELLY(delly_inputs)
+        RUN_DELLY(
+            delly_modes,
+            markedBams,
+            markedBais,
+            callType,
+            channel.value(tumorName),
+            channel.value(GenomeResources[reference]['rundelly_module']),
+            channel.value(GenomeResources[reference]['rundelly_fasta']),
+            channel.value(GenomeResources[reference]['rundelly_exclude_list'])
+        )
 }
