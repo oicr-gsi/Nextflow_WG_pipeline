@@ -3,8 +3,6 @@ nextflow.enable.dsl=2
 process RUN_DELLY {
     tag "$sampleName"
 
-    publishDir "${params.test_data}/delly/output", mode: 'copy'
-
     input:
     val dellyMode
     path bams

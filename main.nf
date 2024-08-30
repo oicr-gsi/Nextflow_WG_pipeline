@@ -7,7 +7,7 @@ include {mutect2} from "./modules/mutect2"
 include {delly} from './workflows/delly'
 
 workflow {
-    
+
     channel
         .of([meta: [id: params.bcl2fastq.meta_id, lane: params.bcl2fastq.meta_lane], samplesheet: file(params.bcl2fastq.samplesheet), run_dir: file(params.bcl2fastq.run_dir)])
         .set { bcl2fastq_input }
@@ -52,8 +52,6 @@ workflow {
         mutect2_bams = tumor_bam_files.combine(normal_bam_files)
         mutect2_indexes = tumor_bam_index_files.combine(normal_bam_index_files)
     }
-    mutect2_bams.view(it -> "mutect2_bams: $it")
-    mutect2_indexes.view(it -> "mutect2_indexes: $it")
 
     mutect2(
         channel.value(params.mutect2.tumor_meta),

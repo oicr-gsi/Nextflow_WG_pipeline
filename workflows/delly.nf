@@ -2,6 +2,7 @@ nextflow.enable.dsl = 2
 
 include { PICARD_MARKDUPLICATES } from "../modules/mark_duplicates"
 include { RUN_DELLY } from "../modules/run_delly.nf"
+include { MERGE_AND_ZIP as mergeAndZipALL; MERGE_AND_ZIP as mergeAndZipFiltered } from "../modules/merge_and_zip.nf"
 
 workflow delly {
     take:
@@ -31,7 +32,6 @@ workflow delly {
         def bamCount = markedBams.map { it -> it.findAll { file -> file.name.endsWith('.bam') }.size() }
         def callType = bamCount.map { count -> count == 1 ? 'unmatched' : 'somatic' }
         def delly_modes = channel.from("DEL", "DUP", "INV", "INS", "BND")
-        markedBams.view(it -> "markedBams: $it")
 
         RUN_DELLY(
             delly_modes,
@@ -43,4 +43,35 @@ workflow delly {
             channel.value(GenomeResources[reference]['rundelly_fasta']),
             channel.value(GenomeResources[reference]['rundelly_exclude_list'])
         )
+
+        mergeAndZipALL (
+            RUN_DELLY.out.outVcf, 
+            RUN_DELLY.out.outTbi,
+            tumorName,
+            callType,
+            params.delly.mergeAndZip_modules,
+            '_all',
+            0
+        )
+
+        def mergeFilteredOutputs = null
+        if (callType == "somatic") {
+            mergeFilteredOutputs = mergeAndZipFiltered (
+                RUN_DELLY.outVcf_filtered,
+                RUN_DELLY.outTbi_filtered,
+                tumorName,
+                callType,
+                params.delly.mergeAndZip_modules,
+                'filtered',
+                0
+            )
+        }
+
+        emit:
+        mergedIndex = mergeAndZipALL.out.dellyMergedTabixIndex
+        mergedVcf   = mergeAndZipALL.out.dellyMergedVcf
+        mergedFilteredIndex = mergeFilteredOutputs ? mergeFilteredOutputs.out.dellyMergedTabixIndex : null
+        mergedFilteredVcf   = mergeFilteredOutputs ? mergeFilteredOutputs.out.dellyMergedVcf : null
+        mergedFilteredPassIndex = mergeFilteredOutputs ? mergeFilteredOutputs.out.dellyMergedPassTabixIndex : null
+        mergedFilteredPassVcf = mergeFilteredOutputs ? mergeFilteredOutputs.out.dellyMergedPassVcf : null
 }
