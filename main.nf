@@ -42,19 +42,27 @@ workflow {
         channel.of(params.bwamem.threads),
         channel.of(params.bwamem.addParem)
     )
-/*   
-    tumor_bam_files = channel.fromPath("${params.test_data}/mutect2/input/*${params.mutect2.tumor_meta}*.bam")
-    tumor_bam_index_files = channel.fromPath("${params.test_data}/mutect2/input/*${params.mutect2.tumor_meta}*.bai")
 
-    if (!params.mutect2.tumor_only_mode) {
-        normal_bam_files = channel.fromPath("${params.test_data}/mutect2/input/*${params.mutect2.normal_meta}*.bam")
-        normal_bam_index_files = channel.fromPath("${params.test_data}/mutect2/input/*${params.mutect2.normal_meta}*.bai")
-    }
+ 
+    def tumor_bam_files = bwaMem.out.bam.map { it -> [it].flatten() }
+    .flatten()
+    .filter { it.toString().contains(params.mutect2.tumor_meta) }
+
+    def tumor_bam_index_files = bwaMem.out.bai.map { it -> [it].flatten() }
+    .flatten()
+    .filter { it.toString().contains(params.mutect2.tumor_meta) }
 
     if (params.mutect2.tumor_only_mode) {
         mutect2_bams = tumor_bam_files
         mutect2_indexes = tumor_bam_index_files
     } else {
+        def normal_bam_files = bwaMem.out.bam.map { it -> [it].flatten() }
+        .flatten()
+        .filter { it.toString().contains(params.mutect2.normal_meta) }
+
+        def normal_bam_index_files = bwaMem.out.bai.map { it -> [it].flatten() }
+            .flatten()
+            .filter { it.toString().contains(params.mutect2.normal_meta) }
         mutect2_bams = tumor_bam_files.combine(normal_bam_files)
         mutect2_indexes = tumor_bam_index_files.combine(normal_bam_index_files)
     }
@@ -69,7 +77,9 @@ workflow {
         channel.value(params.mutect2.reference),
         channel.value(params.mutect2.gatk)
     )
+   
 
+/*   
     tumor_name = params.vep.tumorName
     reference = params.vep.reference
     normal_name = params.vep.normalName
