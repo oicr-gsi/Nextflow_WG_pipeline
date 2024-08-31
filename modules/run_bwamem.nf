@@ -1,41 +1,35 @@
 nextflow.enable.dsl=2
 process BWA_MEM {
-    tag "$meta"
+    tag "$meta-${read1.simpleName}"
 
-    publishDir  "${params.test_data}/bwamem/output", mode: 'copy'
+    publishDir "${params.test_data}/bwamem/output", mode: 'copy'
 
     input:
-    tuple val(meta), path(read1), path(read2)
-    val readGroups
-    val fasta
-    val sort_bam
-    val threads
-    val modules
-    val addParem
+    tuple val(meta), path(read1), path(read2), val(readGroups), val(fasta), val(sort_bam), val(threads), val(modules), val(addParem)
 
     output:
-    tuple val(meta), path("*.bam")  , emit: bam,    optional: true
-    tuple val(meta), path("*.bai")  , emit: bai,    optional: true
-    tuple val(meta), path("*.cram") , emit: cram,   optional: true
-    tuple val(meta), path("*.csi")  , emit: csi,    optional: true
-    tuple val(meta), path("*.crai") , emit: crai,   optional: true
-    path  "versions.yml"            , emit: versions
+    tuple val(meta), path("*.bam"), emit: bam, optional: true
+    tuple val(meta), path("*.bai"), emit: bai, optional: true
+    tuple val(meta), path("*.cram"), emit: cram, optional: true
+    tuple val(meta), path("*.csi"), emit: csi, optional: true
+    tuple val(meta), path("*.crai"), emit: crai, optional: true
+    path "versions.yml", emit: versions
 
     when:
     task.ext.when == null || task.ext.when
 
     script:
-    
     def args = task.ext.args ?: ''
     def args2 = task.ext.args2 ?: ''
-    def prefix = task.ext.prefix ?: "${meta}"
+    def read1_name = read1.name.toString().tokenize('_')[0..4].join('_')
+    def prefix = task.ext.prefix ?: "${meta}-${read1_name}"
     def samtools_command = sort_bam ? 'sort' : 'view'
-    def extension = args2.contains("--output-fmt sam")   ? "sam" :
-                    args2.contains("--output-fmt cram")  ? "cram":
-                    sort_bam && args2.contains("-O cram")? "cram":
-                    !sort_bam && args2.contains("-C")    ? "cram":
+    def extension = args2.contains("--output-fmt sam")    ? "sam" :
+                    args2.contains("--output-fmt cram")   ? "cram":
+                    sort_bam && args2.contains("-O cram") ? "cram":
+                    !sort_bam && args2.contains("-C")     ? "cram":
                     "bam"
-    def reference = fasta && extension=="cram"  ? "--reference ${fasta}" : ""
+    def reference = fasta && extension=="cram" ? "--reference ${fasta}" : ""
     if (!fasta && extension=="cram") error "Fasta reference is required for CRAM output"
     def module_list = modules.split(',')
     def module_load_cmds = module_list.collect { module -> "module load ${module}" }.join('\n')
@@ -54,7 +48,7 @@ process BWA_MEM {
         $read2 \\
         | samtools $samtools_command $args2 ${reference} --threads $threads -o ${prefix}.${extension} -
 
-        samtools index ${prefix}.${extension}
+    samtools index ${prefix}.${extension}
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

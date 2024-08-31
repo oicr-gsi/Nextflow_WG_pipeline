@@ -23,19 +23,22 @@ workflow bwaMem {
         mm10: "/.mounts/labs/gsi/modulator/sw/data/mm10-bwa-index-0.7.17/mm10.fa"
     ]
 
-    bwaMemRef = reference.map { ref -> bwaMemRef_by_genome[ref]}
-    modules = reference.map { ref -> bwaMem_modules_by_genome[ref]}
 
-    BWA_MEM (
-        bwamem_reads,
-        readGroups,
-        bwaMemRef,
-        sort_bam,
-        threads,
-        modules,
-        addParem
-    )
+    process_inputs = bwamem_reads.combine(reference)
+                                 .combine(readGroups)
+                                 .combine(sort_bam)
+                                 .combine(threads)
+                                 .combine(addParem)
+                                 .map { meta, read1, read2, ref, rg, sb, t, ap ->
+                                     def bwaMemRef = bwaMemRef_by_genome[ref]
+                                     def modules = bwaMem_modules_by_genome[ref]
+                                     [meta, read1, read2, rg, bwaMemRef, sb, t, modules, ap]
+                                 }
 
+    process_inputs.view { it -> "Debug - Combined input: $it" }
+
+    BWA_MEM(process_inputs)
+    
     emit:
     bam = BWA_MEM.out.bam
     bai = BWA_MEM.out.bai

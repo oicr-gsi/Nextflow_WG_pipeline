@@ -7,25 +7,31 @@ include {mutect2} from "./modules/mutect2"
 include {delly} from './workflows/delly'
 
 workflow {
-
+/*
     channel
         .of([meta: [id: params.bcl2fastq.meta_id, lane: params.bcl2fastq.meta_lane], samplesheet: file(params.bcl2fastq.samplesheet), run_dir: file(params.bcl2fastq.run_dir)])
         .set { bcl2fastq_input }
     
     BCL2FASTQ(bcl2fastq_input)
-
+*/
     fastq_input = channel
-        .fromPath("${params.test_data}/bwamem/input/*${params.bwamem.meta}*.fastq.gz")
-        .map { file -> 
-            return tuple(params.bwamem.meta, file)
-        }
-        .groupTuple()
+    .fromPath("${params.test_data}/bwamem/input/*${params.bwamem.meta}*.fastq.gz")
+    .map { file -> tuple(params.bwamem.meta, file) }
+    .groupTuple()
 
     bwaMem_reads = fastq_input
-        .map { key, files ->
-            def r1 = files.find { it.name.endsWith('_R1.fastq.gz') }
-            def r2 = files.find { it.name.endsWith('_R2.fastq.gz') }
-            tuple(params.bwamem.meta, r1, r2)
+        .flatMap { meta, files ->
+        // Assume fastq file has format R{1,2}.fastq.gz
+            def pairs = files.groupBy { it.name.tokenize('_').dropRight(1).join('_') }
+            pairs.collect { prefix, pairFiles ->
+                def r1 = pairFiles.find { it.name.endsWith('_R1.fastq.gz') }
+                def r2 = pairFiles.find { it.name.endsWith('_R2.fastq.gz') }
+                if (r1 && r2) {
+                    tuple(meta, r1, r2)
+                } else {
+                    null
+                }
+            }.findAll { it != null }
         }
 
     bwaMem(
@@ -36,7 +42,7 @@ workflow {
         channel.of(params.bwamem.threads),
         channel.of(params.bwamem.addParem)
     )
-   
+/*   
     tumor_bam_files = channel.fromPath("${params.test_data}/mutect2/input/*${params.mutect2.tumor_meta}*.bam")
     tumor_bam_index_files = channel.fromPath("${params.test_data}/mutect2/input/*${params.mutect2.tumor_meta}*.bai")
 
@@ -105,4 +111,5 @@ workflow {
         params.delly.reference,
         params.delly.picard_module
     )
+    */
 }
