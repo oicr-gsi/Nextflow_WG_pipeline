@@ -8,11 +8,9 @@ process BWA_MEM {
     tuple val(meta), path(read1), path(read2), val(readGroups), val(fasta), val(sort_bam), val(threads), val(modules), val(addParem)
 
     output:
-    tuple val(meta), path("*.bam"), emit: bam, optional: true
-    tuple val(meta), path("*.bai"), emit: bai, optional: true
-    tuple val(meta), path("*.cram"), emit: cram, optional: true
-    tuple val(meta), path("*.csi"), emit: csi, optional: true
-    tuple val(meta), path("*.crai"), emit: crai, optional: true
+    path("*.bam"), emit: bam, optional: true
+    path("*.bai"), emit: bai, optional: true
+
     path "versions.yml", emit: versions
 
     when:
@@ -22,7 +20,7 @@ process BWA_MEM {
     def args = task.ext.args ?: ''
     def args2 = task.ext.args2 ?: ''
     def read1_name = read1.name.toString().tokenize('_')[0..4].join('_')
-    def prefix = task.ext.prefix ?: "${meta}-${read1_name}"
+    def prefix = task.ext.prefix ?: "${meta}"
     def samtools_command = sort_bam ? 'sort' : 'view'
     def extension = args2.contains("--output-fmt sam")    ? "sam" :
                     args2.contains("--output-fmt cram")   ? "cram":
@@ -40,9 +38,7 @@ process BWA_MEM {
     cp ${fasta}.{amb,ann,bwt,pac,sa,alt,fai} .
 
     bwa mem -M \\
-        $args \\
-        -t $threads $addParem \\
-        -R $readGroups \\
+        -t $threads \\
         $fasta \\
         $read1 \\
         $read2 \\

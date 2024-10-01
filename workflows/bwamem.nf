@@ -1,9 +1,9 @@
 nextflow.enable.dsl=2
-include {BWA_MEM} from './run_bwamem'
+include {BWA_MEM} from '../modules/run_bwamem'
 
 workflow bwaMem {
     take:
-    bwamem_reads
+    fastq_inputs
     readGroups
     reference
     sort_bam
@@ -24,7 +24,7 @@ workflow bwaMem {
     ]
 
 
-    process_inputs = bwamem_reads.combine(reference)
+    process_inputs = fastq_inputs.combine(reference)
                                  .combine(readGroups)
                                  .combine(sort_bam)
                                  .combine(threads)
@@ -35,7 +35,7 @@ workflow bwaMem {
                                      [meta, read1, read2, rg, bwaMemRef, sb, t, modules, ap]
                                  }
 
-    process_inputs.view { it -> "Debug - Combined input: $it" }
+    //process_inputs.view { it -> "Debug - Combined input: $it" }
 
     BWA_MEM(process_inputs)
     
