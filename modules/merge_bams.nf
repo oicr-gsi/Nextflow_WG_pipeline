@@ -6,6 +6,7 @@ process PICARD_MERGESAMFILES {
 
     output:
     tuple val(meta), path("*.bam"), emit: bam
+    tuple val(meta), path("*.bai"), emit: bai
 
     when:
     task.ext.when == null || task.ext.when
@@ -27,7 +28,8 @@ process PICARD_MERGESAMFILES {
         java -Xmx${avail_mem}G -jar \$PICARD_ROOT/picard.jar MergeSamFiles \\
             $args \\
             ${'--INPUT '+bam_files.join(' --INPUT ')} \\
-            --OUTPUT ${prefix}.bam
+            --OUTPUT ${prefix}.merged.bam \\
+            --CREATE_INDEX true
         cat <<-END_VERSIONS > versions.yml
         "${task.process}":
             picard: \$( echo \$(picard MergeSamFiles --version 2>&1) | grep -o 'Version:.*' | cut -f2- -d:)
@@ -35,7 +37,9 @@ process PICARD_MERGESAMFILES {
         """
     } else {
         """
-        ln -s ${bam_files[0]} ${prefix}.bam
+        module load samtools
+        ln -s ${bam_files[0]} ${prefix}.merged.bam
+        samtools index ${prefix}.merged.bam
         cat <<-END_VERSIONS > versions.yml
         "${task.process}":
             picard: \$( echo \$(picard MergeSamFiles --version 2>&1) | grep -o 'Version:.*' | cut -f2- -d:)

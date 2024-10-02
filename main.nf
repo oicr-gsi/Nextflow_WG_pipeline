@@ -121,42 +121,43 @@ bams_to_merge = bwaMem.out.bam
     }
 
 PICARD_MERGESAMFILES(bams_to_merge)
+ 
+def tumor_bam = PICARD_MERGESAMFILES.out.bam
+    .filter { meta, bam -> 
+        meta.geo_tissue_type != 'R'
+    }
+    .map { meta, bam -> bam
+}
 
- /*
-    def tumor_bam_files = bwaMem.out.bam
-    .filter { it.toString().contains(params.mutect2.tumor_meta) }
+def tumor_meta = PICARD_MERGESAMFILES.out.bam
+    .filter { meta, bam -> 
+        meta.geo_tissue_type != 'R'
+    }
+    .map { meta, bam -> meta
+}
 
-    def tumor_bam_index_files = bwaMem.out.bai
-    .filter { it.toString().contains(params.mutect2.tumor_meta) }
-    //tumor_bam_files.view(it -> "tumor_bam: ${it}")
-
-    if (params.mutect2.tumor_only_mode) {
-        mutect2_bams = tumor_bam_files
-        mutect2_indexes = tumor_bam_index_files
-    } else {
-        def normal_bam_files = bwaMem.out.bam
-        .filter { it.toString().contains(params.mutect2.normal_meta) }
-
-        def normal_bam_index_files = bwaMem.out.bai
-            .filter { it.toString().contains(params.mutect2.normal_meta) }
-        mutect2_bams = tumor_bam_files.combine(normal_bam_files)
-        mutect2_indexes = tumor_bam_index_files.combine(normal_bam_index_files)
+if (params.mutect2.tumor_only_mode) {
+    mutect2_bams = tumor_bam
+} else {
+    def normal_bam = PICARD_MERGESAMFILES.out.bam
+    .filter { meta, bam -> 
+        meta.geo_tissue_type == 'R'
+    }
+    .map { meta, bam -> bam
     }
 
-    mutect2_bams.view(it -> "mutect2_bams: $it")
+    mutect2_bams = tumor_bam.combine(normal_bam)
+}
 
-
-/*
-    mutect2(
-        channel.value(params.mutect2.tumor_meta),
-        mutect2_bams,
-        mutect2_indexes,
-        channel.fromPath(params.mutect2.intervals),
-        params.mutect2.panel_of_normals ? channel.fromPath(params.mutect2.panel_of_normals) : channel.value('NO_PON'),
-        params.mutect2.panel_of_normals_tbi ? channel.fromPath(params.mutect2.panel_of_normals_tbi) :  channel.value('NO_PON_TBI'),
-        channel.value(params.mutect2.reference),
-        channel.value(params.mutect2.gatk)
-    )
+mutect2(
+    tumor_meta,
+    mutect2_bams,
+    channel.fromPath(params.mutect2.intervals),
+    params.mutect2.panel_of_normals ? channel.fromPath(params.mutect2.panel_of_normals) : channel.value('NO_PON'),
+    params.mutect2.panel_of_normals_tbi ? channel.fromPath(params.mutect2.panel_of_normals_tbi) :  channel.value('NO_PON_TBI'),
+    channel.value(params.mutect2.reference),
+    channel.value(params.mutect2.gatk)
+)
    
 
 /*   

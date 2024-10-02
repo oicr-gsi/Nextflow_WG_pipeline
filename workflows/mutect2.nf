@@ -7,7 +7,6 @@ workflow mutect2 {
 
     tumor_meta
     input_bam
-    input_index
     intervalFile
     pon
     ponIdx
@@ -58,7 +57,6 @@ workflow mutect2 {
     GATK4_MUTECT2(
         tumor_meta,
         input_bam,
-        input_index,
         intervalFile,
         mutect2_params.refFasta,
         mutect2_params.refFai,

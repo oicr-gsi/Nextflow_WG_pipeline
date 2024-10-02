@@ -1,14 +1,13 @@
 nextflow.enable.dsl=2
 
 process GATK4_MUTECT2 {
-    tag "$tumor_meta"
+    tag "${tumor_meta.library_name}"
 
     publishDir  "${params.test_data}/mutect2/output", mode: "copy"
 
     input:
     val tumor_meta
     path input_bam
-    path input_index
     val intervals
     val ref_fasta
     val ref_fai
@@ -31,31 +30,23 @@ process GATK4_MUTECT2 {
 
     script:
     def args = task.ext.args ?: ''
-    def prefix = "${tumor_meta}_${params.mutect2.mutectTag}"
+    def prefix = "${tumor_meta.library_name}_${params.mutect2.mutectTag}"
     def input_bams = input_bam.collect{ "--input $it"}.join(" ")
     def interval_command = intervals ? "--intervals $intervals" : ""
     def pon_command = panel_of_normals != 'NO_PON' ?  "--panel-of-normals $panel_of_normals" : ""
     def gr_command = germline_resource != 'no_gnomad' ? "--germline-resource $germline_resource" : ""
 
-    def avail_mem = 3072
+    def avail_mem = 8
     if (!task.memory) {
-        log.info '[GATK Mutect2] Available memory not known - defaulting to 3GB. Specify process memory requirements to change this.'
+        log.info '[GATK Mutect2] Available memory not known - defaulting to 8GB. Specify process memory requirements to change this.'
     } else {
-        avail_mem = (task.memory.mega*0.8).intValue()
+        avail_mem = (task.memory.giga*0.8).intValue()
     }
     """
-    module load python/3.8.12 
-    module load $gatk
-    # Ensure Python3 is available and create a symlink if necessary
-    if command -v python3 >/dev/null 2>&1; then
-        ln -sf \$(which python3) ./python
-        export PATH=./:\$PATH
-    else
-        echo "Error: Python3 is not available after loading the module" >&2
-        exit 1
-    fi
 
-    gatk --java-options "-Xmx${avail_mem}M -XX:-UsePerfData" \\
+    module load $gatk
+
+    gatk --java-options "-Xmx${avail_mem}G -XX:-UsePerfData" \\
         Mutect2 \\
         $input_bams \\
         --output ${prefix}.vcf.gz \\
@@ -72,7 +63,7 @@ process GATK4_MUTECT2 {
     END_VERSIONS
     """
     stub:
-    def prefix = task.ext.prefix ?: "${tumor_meta}"
+    def prefix = task.ext.prefix ?: "${tumor_meta.library_name}"
     """
     touch ${prefix}.vcf.gz
     touch ${prefix}.vcf.gz.tbi
