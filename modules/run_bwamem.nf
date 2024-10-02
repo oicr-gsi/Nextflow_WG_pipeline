@@ -1,6 +1,6 @@
 nextflow.enable.dsl=2
 process BWA_MEM {
-    tag "$meta-${read1.simpleName}"
+    tag "$meta.pair_id"
 
     publishDir "${params.test_data}/bwamem/output", mode: 'copy'
 
@@ -23,7 +23,7 @@ process BWA_MEM {
     def args = task.ext.args ?: ''
     def args2 = task.ext.args2 ?: ''
     def read1_name = read1.name.toString().tokenize('_')[0..4].join('_')
-    def prefix = task.ext.prefix ?: "${meta}"
+    def prefix = task.ext.prefix ?: "${meta.pair_id}"
     def samtools_command = sort_bam ? 'sort' : 'view'
     def extension = args2.contains("--output-fmt sam")    ? "sam" :
                     args2.contains("--output-fmt cram")   ? "cram":
@@ -61,7 +61,7 @@ process BWA_MEM {
     stub:
     def args = task.ext.args ?: ''
     def args2 = task.ext.args2 ?: ''
-    def prefix = task.ext.prefix ?: "${meta.id}"
+    def prefix = task.ext.prefix ?: "${meta.pair_id}"
     def samtools_command = sort_bam ? 'sort' : 'view'
     def extension = args2.contains("--output-fmt sam")   ? "sam" :
                     args2.contains("--output-fmt cram")  ? "cram":

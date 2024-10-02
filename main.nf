@@ -5,6 +5,7 @@ include {bwaMem} from './workflows/bwamem'
 include {vep} from "./workflows/vep"
 include {mutect2} from "./workflows/mutect2"
 include {delly} from './workflows/delly'
+include {PICARD_MERGESAMFILES} from "./modules/merge_bams"
 
 // Function to parse attributes string into a map
 def parseAttributes(attr) {
@@ -24,38 +25,10 @@ def extractDonor(sampleName) {
 }
 
 workflow {
-/*
-    channel
-        .of([meta: [id: params.bcl2fastq.meta_id, lane: params.bcl2fastq.meta_lane], samplesheet: file(params.bcl2fastq.samplesheet), run_dir: file(params.bcl2fastq.run_dir)])
-        .set { bcl2fastq_input }
-    
-    BCL2FASTQ(bcl2fastq_input)
-
-    fastq_input = channel
-    .fromPath("${params.test_data}/inputs/*${params.bwamem.meta}*.fastq.gz")
-    .map { file -> tuple(params.bwamem.meta, file) }
-    .groupTuple()
-
-    bwaMem_reads = fastq_input
-        .flatMap { meta, files ->
-        // Assume fastq file has format R{1,2}.fastq.gz
-            def pairs = files.groupBy { it.name.tokenize('_').dropRight(1).join('_') }
-            pairs.collect { prefix, pairFiles ->
-                def r1 = pairFiles.find { it.name.endsWith('_R1.fastq.gz ') }
-                def r2 = pairFiles.find { it.name.endsWith('_R2.fastq.gz ') }
-                if (r1 && r2) {
-                    tuple(meta, r1, r2)
-                } else {
-                    null
-                }
-            }.findAll { it != null }
-        }
-*/
-
 
 // Input data source data.tsv is a tsv file with 10 columns separated by tab. Columns are:
 // Project Sample Name     Sample Attributes       Sequencer Run Name      Sequencer Run Attributes        Lane Name       Lane Number     Lane Attributes IUS Tag File Path
-// All columns except last "File Path" are considered metadata(which would be carried along the input/output channels), but some columns: Sample Attributes , Sequencer Run Attributes , Lane Attributes are themself multiple fields separated by ";".
+// All columns except last "File Path" are considered metadata(which would be carried along the input/output channels), but some columns: Sample Attributes, Sequencer Run Attributes, Lane Attributes are themself multiple fields separated by ";".
 // Create the fastq_inputs channel
 file_inputs = Channel
     .fromPath('tests/data.tsv')
@@ -100,50 +73,54 @@ fastq_inputs = file_inputs
         return tuple(key, value)
     }
     .groupTuple()
-    .map { library_name, group ->
+    .flatMap { library_name, group ->
         def meta = group.first().meta
-        def r1 = group.find { it.file.name.endsWith('R1.fastq.gz') }?.file
-        def r2 = group.find { it.file.name.endsWith('R2.fastq.gz') }?.file
         
-        if (r1 && r2) {
-            return tuple(meta, r1, r2)
-        } else {
-            return null  // or handle the case where R1 or R2 is missing
+        // Group files by their base name (without R1/R2 suffix)
+        def fileGroups = group.groupBy { item ->
+            item.file.name.replaceFirst(/_R[12]\.fastq\.gz$/, '')
+        }
+        
+        // For each group, find R1 and R2 files and emit as individual pairs
+        return fileGroups.collect { _, files ->
+            def r1 = files.find { it.file.name.endsWith('R1.fastq.gz') }?.file
+            def r2 = files.find { it.file.name.endsWith('R2.fastq.gz') }?.file
+            
+            if (r1 && r2) {
+                // Create a new meta map for each pair, including a unique identifier
+                def pairMeta = meta.clone()
+                pairMeta.pair_id = r1.name.replaceFirst(/_R1\.fastq\.gz$/, '')
+                return tuple(pairMeta, r1, r2)
+            } else {
+                return null
+            }
         }
     }
     .filter { it != null }
 
-// Example of using the channel
-fastq_inputs.view { meta, fastqR1, fastqR2 ->
-    "Library: ${meta.library_name}, R1: ${fastqR1.name}, R2: ${fastqR2.name}"
-}
-/*
-// Read meta.txt and create a channel
-fastq_inputs = Channel
-    .fromPath("${params.test_data}/meta.txt")
-    .splitCsv(sep: ' ')
-    .map { row -> tuple(row[0], file("${params.test_data}/inputs/${row[1]}")) }
+bwaMem(
+    fastq_inputs,
+    channel.of(params.bwamem.readGroups),
+    channel.of(params.bwamem.reference),
+    channel.of(params.bwamem.sort_bam),
+    channel.of(params.bwamem.threads),
+    channel.of(params.bwamem.addParem)
+)
+
+// Merge bams of multiple lanes of same library
+bams_to_merge = bwaMem.out.bam
+    .map { meta, bam -> 
+        def key = meta.library_name
+        return tuple(key, tuple(meta, bam))
+    }
     .groupTuple()
-    .map { meta, files -> 
-        def r1 = files.find { it.name.endsWith("_R1.fastq.gz") }
-        def r2 = files.find { it.name.endsWith("_R2.fastq.gz") }
-        if (r1 && r2) {
-            return tuple(meta, r1, r2)
-        } else {
-            return null
-        }
+    .map { library_name, group ->
+        def meta = group.first()[0]  // Get the meta from the first item
+        def bams = group.collect { it[1] }  // Collect all BAM files
+        return tuple(meta, bams)
     }
-    .filter { it != null }
 
-    bwaMem(
-        fastq_inputs,
-        channel.of(params.bwamem.readGroups),
-        channel.of(params.bwamem.reference),
-        channel.of(params.bwamem.sort_bam),
-        channel.of(params.bwamem.threads),
-        channel.of(params.bwamem.addParem)
-    )
-    bwaMem.out.bam.view{it -> "bamout: $it"}
+PICARD_MERGESAMFILES(bams_to_merge)
 
  /*
     def tumor_bam_files = bwaMem.out.bam
