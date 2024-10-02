@@ -2,7 +2,7 @@ nextflow.enable.dsl = 2
 
 include { PICARD_MARKDUPLICATES } from "../modules/mark_duplicates"
 include { RUN_DELLY } from "../modules/run_delly.nf"
-include { MERGE_AND_ZIP as mergeAndZipALL; MERGE_AND_ZIP as mergeAndZipFiltered } from "../modules/merge_and_zip.nf"
+include { MERGE_AND_ZIP as mergeAndZipALL; MERGE_AND_ZIP as mergeAndZipFiltered } from "../modules/merge_vcf.nf"
 
 workflow delly {
     take:

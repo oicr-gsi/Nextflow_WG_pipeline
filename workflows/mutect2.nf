@@ -1,5 +1,5 @@
 nextflow.enable.dsl=2
-include {GATK4_MUTECT2} from "../modules/gatk4_mutect2"
+include {GATK4_MUTECT2} from "../modules/run_mutect2"
 
 workflow mutect2 {
 

@@ -8,8 +8,11 @@ process BWA_MEM {
     tuple val(meta), path(read1), path(read2), val(readGroups), val(fasta), val(sort_bam), val(threads), val(modules), val(addParem)
 
     output:
-    path("*.bam"), emit: bam, optional: true
-    path("*.bai"), emit: bai, optional: true
+    tuple val(meta), path("*.bam"), emit: bam, optional: true
+    tuple val(meta), path("*.bai"), emit: bai, optional: true
+    tuple val(meta), path("*.cram"), emit: cram, optional: true
+    tuple val(meta), path("*.csi"), emit: csi, optional: true
+    tuple val(meta), path("*.crai"), emit: crai, optional: true
 
     path "versions.yml", emit: versions
 
@@ -38,7 +41,9 @@ process BWA_MEM {
     cp ${fasta}.{amb,ann,bwt,pac,sa,alt,fai} .
 
     bwa mem -M \\
-        -t $threads \\
+        $args \\
+        -t $threads $addParem \\
+        -R $readGroups \\
         $fasta \\
         $read1 \\
         $read2 \\

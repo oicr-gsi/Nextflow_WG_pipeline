@@ -6,6 +6,23 @@ include {vep} from "./workflows/vep"
 include {mutect2} from "./workflows/mutect2"
 include {delly} from './workflows/delly'
 
+// Function to parse attributes string into a map
+def parseAttributes(attr) {
+    attr.split(';').collectEntries { 
+        def parts = it.split('=', 2)
+        [(parts[0]): parts.size() > 1 ? parts[1] : true]
+    }
+}
+
+// Function to extract donor from Sample Name
+def extractDonor(sampleName) {
+    def parts = sampleName.split('_')
+    if (parts.size() >= 2) {
+        return parts[0] + '_' + parts[1]
+    }
+    return sampleName  // Return full sample name if it doesn't match expected format
+}
+
 workflow {
 /*
     channel
@@ -34,6 +51,51 @@ workflow {
             }.findAll { it != null }
         }
 */
+
+
+// Create the fastq_inputs channel
+// Create the fastq_inputs channel
+fastq_inputs = Channel
+    .fromPath('tests/data.tsv')
+    .splitCsv(sep: '\t', header: true)
+    .map { row ->
+        // Initialize meta map with simple fields
+        def meta = [
+            project: row.'Project',
+            sample_name: row.'Sample Name',
+            sequencer_run_name: row.'Sequencer Run Name',
+            lane_name: row.'Lane Name',
+            lane_number: row.'Lane Number',
+            ius_tag: row.'IUS Tag'
+        ]
+
+        // Parse and add nested attributes
+        meta += parseAttributes(row.'Sample Attributes')
+        meta += parseAttributes(row.'Sequencer Run Attributes')
+        meta += parseAttributes(row.'Lane Attributes')
+
+        // Extract donor from Sample Name
+        meta.donor = extractDonor(row.'Sample Name')
+
+        // Create library_name
+        meta.library_name = [
+            meta.donor,
+            meta.geo_tissue_origin,
+            meta.geo_tissue_type,
+            meta.geo_library_source_template_type,
+            meta.geo_group_id
+        ].join('_')
+
+        // Create tuple with meta and file
+        [meta, file(row.'File Path')]
+    }
+
+// Example of using the channel
+fastq_inputs.view { meta, file ->
+    "Sample: ${meta.sample_name}, Lane name: ${meta.lane_name}, Donor: ${meta.donor}, Library Name: ${meta.library_name}, File: ${file.name}"
+}
+
+/*
 // Read meta.txt and create a channel
 fastq_inputs = Channel
     .fromPath("${params.test_data}/meta.txt")
@@ -59,8 +121,9 @@ fastq_inputs = Channel
         channel.of(params.bwamem.threads),
         channel.of(params.bwamem.addParem)
     )
+    bwaMem.out.bam.view{it -> "bamout: $it"}
 
- 
+ /*
     def tumor_bam_files = bwaMem.out.bam
     .filter { it.toString().contains(params.mutect2.tumor_meta) }
 

@@ -1,5 +1,5 @@
 nextflow.enable.dsl=2
-include {ENSEMBLVEP_VEP} from "../modules/ensemblvep_vep"
+include {ENSEMBLVEP_VEP} from "../modules/run_vep"
 
 workflow vep {
 
