@@ -53,9 +53,11 @@ workflow {
 */
 
 
+// Input data source data.tsv is a tsv file with 10 columns separated by tab. Columns are:
+// Project Sample Name     Sample Attributes       Sequencer Run Name      Sequencer Run Attributes        Lane Name       Lane Number     Lane Attributes IUS Tag File Path
+// All columns except last "File Path" are considered metadata(which would be carried along the input/output channels), but some columns: Sample Attributes , Sequencer Run Attributes , Lane Attributes are themself multiple fields separated by ";".
 // Create the fastq_inputs channel
-// Create the fastq_inputs channel
-fastq_inputs = Channel
+file_inputs = Channel
     .fromPath('tests/data.tsv')
     .splitCsv(sep: '\t', header: true)
     .map { row ->
@@ -90,11 +92,31 @@ fastq_inputs = Channel
         [meta, file(row.'File Path')]
     }
 
-// Example of using the channel
-fastq_inputs.view { meta, file ->
-    "Sample: ${meta.sample_name}, Lane name: ${meta.lane_name}, Donor: ${meta.donor}, Library Name: ${meta.library_name}, File: ${file.name}"
-}
+// Create the fastq_inputs channel
+fastq_inputs = file_inputs
+    .map { meta, file -> 
+        def key = meta.library_name
+        def value = [meta: meta, file: file]
+        return tuple(key, value)
+    }
+    .groupTuple()
+    .map { library_name, group ->
+        def meta = group.first().meta
+        def r1 = group.find { it.file.name.endsWith('R1.fastq.gz') }?.file
+        def r2 = group.find { it.file.name.endsWith('R2.fastq.gz') }?.file
+        
+        if (r1 && r2) {
+            return tuple(meta, r1, r2)
+        } else {
+            return null  // or handle the case where R1 or R2 is missing
+        }
+    }
+    .filter { it != null }
 
+// Example of using the channel
+fastq_inputs.view { meta, fastqR1, fastqR2 ->
+    "Library: ${meta.library_name}, R1: ${fastqR1.name}, R2: ${fastqR2.name}"
+}
 /*
 // Read meta.txt and create a channel
 fastq_inputs = Channel
